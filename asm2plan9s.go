@@ -105,32 +105,27 @@ func assemble(lines []byte) ([]byte, error) {
 
 func yasm(instr []byte) ([]byte, error) {
 
-	content := append([]byte("[bits 64]\n"), instr...)
 	tmpfile, err := ioutil.TempFile("", "asm2plan9s")
 	if err != nil {
 		return nil, err
 	}
+	asmFile := tmpfile.Name() + ".asm"
+	objFile := tmpfile.Name() + ".obj"
+	os.Rename(tmpfile.Name(), asmFile)
+	defer os.Remove(asmFile)
 
-	if _, err := tmpfile.Write(content); err != nil {
+	if _, err := tmpfile.Write(append([]byte("[bits 64]\n"), instr...)); err != nil {
 		return nil, err
 	}
 	if err := tmpfile.Close(); err != nil {
 		return nil, err
 	}
 
-	asmFile := tmpfile.Name() + ".asm"
-	objFile := tmpfile.Name() + ".obj"
-	os.Rename(tmpfile.Name(), asmFile)
-
-	defer os.Remove(asmFile) // clean up
-	defer os.Remove(objFile) // clean up
-
 	app := "yasm"
-	arg0 := "-o"
-	arg1 := objFile
-	arg2 := asmFile
+	arg0 := "-o" + objFile
+	cmd := exec.Command(app, arg0, asmFile)
 
-	cmd := exec.Command(app, arg0, arg1, arg2)
+	defer os.Remove(objFile) // output file created by yasm
 	cmb, err := cmd.CombinedOutput()
 	if err != nil {
 		yasmErrs := bytes.Split(cmb[len(asmFile)+1:], []byte(":"))
