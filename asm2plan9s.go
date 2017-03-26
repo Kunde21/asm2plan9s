@@ -58,13 +58,15 @@ func assemble(lines []byte) ([]byte, error) {
 			continue
 		}
 		start := bytes.Index(line, sigil)
-		instr := bytes.TrimSpace(bytes.SplitN(line[start+4:], []byte("/*"), 2)[0])
-		yasmCode, err := yasm(string(instr), ln, len(instr), false)
+		instr := bytes.TrimSpace(bytes.SplitN(line[start+len(sigil):], []byte("/*"), 2)[0])
+		byteCode, err := yasm(instr)
 		//byteCode, err := convertInstr(instr)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Line %d", ln)
 		}
-		byteCode := []byte(yasmCode)
+
+		outLine, err := toPlan9s(byteCode, string(instr), len(instr), false)
+		byteCode = []byte(outLine)
 
 		if bytes.Contains(line[:start], []byte(`\`)) {
 			byteCode = bytes.Replace(byteCode, []byte("//"), []byte(`\ //`), 1)
@@ -101,20 +103,19 @@ func assemble(lines []byte) ([]byte, error) {
 // 00000000 <.text>:
 // 0:   c5 ed ef e3             vpxor  ymm4,ymm2,ymm3
 
-func yasm(instr string, lineno, commentPos int, inDefine bool) (string, error) {
+func yasm(instr []byte) ([]byte, error) {
 
-	instrFields := strings.Split(instr, "/*")
-	content := []byte("[bits 64]\n" + instrFields[0])
+	content := append([]byte("[bits 64]\n"), instr...)
 	tmpfile, err := ioutil.TempFile("", "asm2plan9s")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if _, err := tmpfile.Write(content); err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := tmpfile.Close(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	asmFile := tmpfile.Name() + ".asm"
@@ -125,7 +126,6 @@ func yasm(instr string, lineno, commentPos int, inDefine bool) (string, error) {
 	defer os.Remove(objFile) // clean up
 
 	app := "yasm"
-
 	arg0 := "-o"
 	arg1 := objFile
 	arg2 := asmFile
@@ -133,19 +133,20 @@ func yasm(instr string, lineno, commentPos int, inDefine bool) (string, error) {
 	cmd := exec.Command(app, arg0, arg1, arg2)
 	cmb, err := cmd.CombinedOutput()
 	if err != nil {
-		yasmErrs := strings.Split(string(cmb)[len(asmFile)+1:], ":")
-		yasmErr := strings.Join(yasmErrs[1:], ":")
-		return "", errors.New(fmt.Sprintf("YASM error (line %d for '%s'):", lineno+1, strings.TrimSpace(instr)) + yasmErr)
+		yasmErrs := bytes.Split(cmb[len(asmFile)+1:], []byte(":"))
+		yasmErr := bytes.Join(yasmErrs[1:], []byte(":"))
+		return nil, errors.Errorf("YASM error on '%s': %s", bytes.TrimSpace(instr), yasmErr)
 	}
 
-	return toPlan9s(objFile, instr, commentPos, inDefine)
-}
-
-func toPlan9s(objFile, instr string, commentPos int, inDefine bool) (string, error) {
 	objcode, err := ioutil.ReadFile(objFile)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+
+	return objcode, nil
+}
+
+func toPlan9s(objcode []byte, instr string, commentPos int, inDefine bool) (string, error) {
 
 	sline := "    "
 	i := 0
