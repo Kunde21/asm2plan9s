@@ -9,9 +9,20 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 
+	"github.com/klauspost/asmfmt"
 	"github.com/pkg/errors"
 )
+
+var (
+	reg, xreg *regexp.Regexp
+)
+
+func init() {
+	reg = regexp.MustCompile("([^R])(AX|CX|DX|BX|SP|BP|SI|DI)")
+	xreg = regexp.MustCompile("([^0])(X|Y)([^M])")
+}
 
 func main() {
 
@@ -25,7 +36,7 @@ usage: asm2plan9s file
 	fmt.Println("Processing", os.Args[1])
 	source, err := ioutil.ReadFile(os.Args[1])
 	if err != nil {
-		log.Fatalf("readLines: %s", err)
+		log.Fatal("ReadFile: ", err)
 	}
 
 	inBuf := bytes.NewReader(source)
@@ -41,9 +52,14 @@ usage: asm2plan9s file
 		log.Fatal("Bufio error: ", err)
 	}
 
-	err = ioutil.WriteFile(os.Args[1], result.Bytes(), 0600)
+	final, err := asmfmt.Format(bytes.NewReader(result.Bytes()))
 	if err != nil {
-		log.Fatalf("writeLines: %s", err)
+		log.Fatal("asmfmt error: ", err)
+	}
+
+	err = ioutil.WriteFile(os.Args[1], final, 0600)
+	if err != nil {
+		log.Fatal("WriteFile: ", err)
 	}
 }
 
@@ -58,12 +74,12 @@ func assemble(input io.Reader, output io.Writer) error {
 		line = inBuf.Bytes()
 		if !bytes.Contains(line, sigil) {
 			output.Write(line)
+			output.Write([]byte{'\n'})
 			continue
 		}
 		start := bytes.Index(line, sigil)
 		instr := bytes.TrimSpace(bytes.SplitN(line[start+len(sigil):], []byte("/*"), 2)[0])
-		byteCode, err := yasm(instr)
-		//byteCode, err := convertInstr(instr)
+		byteCode, err := yasm(convertInstr(instr))
 		if err != nil {
 			return errors.Wrapf(err, "Line %d", ln)
 		}
@@ -74,9 +90,50 @@ func assemble(input io.Reader, output io.Writer) error {
 			start = idx
 		}
 		output.Write(line[start:])
+		output.Write([]byte("\n"))
 	}
 
 	return nil
+}
+
+// convertInstr converts the GoAsm format (plan9 order) into Intel style for yasm.
+func convertInstr(instr []byte) []byte {
+
+	instr = bytes.ToUpper(instr)
+	if reg.Match(instr) || xreg.Match(instr) {
+		instr = reg.ReplaceAll(instr, []byte("${1}R$2"))
+		instr = xreg.ReplaceAll(instr, []byte("${1}${2}MM$3"))
+		flds := bytes.FieldsFunc(instr, func(r rune) bool {
+			return r == ' ' || r == '\t' || r == ','
+		})
+
+		switch {
+		case bytes.Contains(flds[1], []byte{'$'}) &&
+			!bytes.Contains(flds[len(flds)-1], []byte{'$'}):
+			// [f3, ][f4, ]f2, f1
+			switch len(flds) {
+			case 5:
+				instr = []byte(fmt.Sprintf("%s %s, %s, %s, %s", flds[0], flds[4], flds[2], flds[3], flds[1]))
+			case 4:
+				instr = []byte(fmt.Sprintf("%s %s, %s, %s", flds[0], flds[3], flds[2], flds[1]))
+			case 3:
+				instr = []byte(fmt.Sprintf("%s %s, %s", flds[0], flds[2], flds[1]))
+			}
+		case !bytes.Contains(flds[len(flds)-1], []byte{'$'}):
+			// f2, [f3, ][f4, ]f1
+			switch len(flds) {
+			case 5:
+				instr = []byte(fmt.Sprintf("%s %s, %s, %s, %s", flds[0], flds[4], flds[1], flds[2], flds[3]))
+			case 4:
+				instr = []byte(fmt.Sprintf("%s %s, %s, %s", flds[0], flds[3], flds[1], flds[2]))
+			case 3:
+				instr = []byte(fmt.Sprintf("%s %s, %s", flds[0], flds[2], flds[1]))
+			}
+		}
+		instr = bytes.Replace(instr, []byte{'$'}, []byte{' '}, -1)
+	}
+
+	return instr
 }
 
 //
@@ -163,19 +220,4 @@ func toPlan9s(objcode []byte, output io.Writer) {
 			fmt.Fprint(output, " ")
 		}
 	}
-}
-
-// writeLines writes the lines to the given file.
-func writeLines(lines []string, path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
-	for _, line := range lines {
-		fmt.Fprintln(w, line)
-	}
-	return w.Flush()
 }
