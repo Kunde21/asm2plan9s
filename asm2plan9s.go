@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -62,9 +63,7 @@ func assemble(lines []byte) ([]byte, error) {
 			return nil, errors.Wrapf(err, "Line %d", ln)
 		}
 
-		outLine, err := toPlan9s(byteCode)
-		byteCode = []byte(outLine)
-		outBuf.Write(byteCode)
+		toPlan9s(byteCode, outBuf)
 
 		if idx := bytes.Index(line[:start], []byte(`\`)); idx > 0 {
 			start = idx
@@ -139,38 +138,31 @@ func yasm(instr []byte) ([]byte, error) {
 	return objcode, nil
 }
 
-func toPlan9s(objcode []byte) (string, error) {
+func toPlan9s(objcode []byte, output io.Writer) (string, error) {
 
-	result := bytes.NewBuffer([]byte("    "))
-	outBuf := bufio.NewWriter(result)
-
+	output.Write([]byte("    "))
 	for ln := len(objcode); ln > 0; {
 		switch {
 		case ln >= 4:
-			fmt.Fprintf(outBuf, "LONG $0x%02x%02x%02x%02x",
+			fmt.Fprintf(output, "LONG $0x%02x%02x%02x%02x",
 				objcode[3], objcode[2], objcode[1], objcode[0])
 			objcode = objcode[4:]
 			ln -= 4
 		case ln >= 2:
-			fmt.Fprintf(outBuf, "WORD $0x%02x%02x", objcode[1], objcode[0])
+			fmt.Fprintf(output, "WORD $0x%02x%02x", objcode[1], objcode[0])
 			objcode = objcode[2:]
 			ln -= 2
 		default:
-			fmt.Fprintf(outBuf, "BYTE $0x%02x", objcode[0])
+			fmt.Fprintf(output, "BYTE $0x%02x", objcode[0])
 			objcode = objcode[1:]
 			ln--
 		}
 		if ln != 0 {
-			fmt.Fprint(outBuf, "; ")
+			fmt.Fprint(output, "; ")
 		} else {
-			fmt.Fprint(outBuf, " ")
+			fmt.Fprint(output, " ")
 		}
 	}
-	if err := outBuf.Flush(); err != nil {
-		return "", errors.Wrap(err, "Bufio error")
-	}
-
-	return result.String(), nil
 }
 
 // startsAfterLongWordByteSequence determines if an assembly instruction
