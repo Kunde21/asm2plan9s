@@ -42,8 +42,8 @@ usage: asm2plan9s file
 // assemble assembles an array to lines into their
 // resulting plan9 equivalent
 func assemble(lines []byte) ([]byte, error) {
-	result := bytes.NewBuffer(make([]byte, 0, len(lines)))
 	inBuf := bufio.NewScanner(bytes.NewReader(lines))
+	result := bytes.NewBuffer(make([]byte, 0, len(lines)))
 	outBuf := bufio.NewWriter(result)
 
 	var line []byte
@@ -51,10 +51,7 @@ func assemble(lines []byte) ([]byte, error) {
 	for ln := 1; inBuf.Scan(); ln++ {
 		line = inBuf.Bytes()
 		if !bytes.Contains(line, sigil) {
-			_, err := outBuf.Write(line)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Line %d", ln)
-			}
+			outBuf.Write(line)
 			continue
 		}
 		start := bytes.Index(line, sigil)
@@ -65,19 +62,20 @@ func assemble(lines []byte) ([]byte, error) {
 			return nil, errors.Wrapf(err, "Line %d", ln)
 		}
 
-		outLine, err := toPlan9s(byteCode, string(instr), len(instr), false)
+		outLine, err := toPlan9s(byteCode)
 		byteCode = []byte(outLine)
+		outBuf.Write(byteCode)
 
-		if bytes.Contains(line[:start], []byte(`\`)) {
-			byteCode = bytes.Replace(byteCode, []byte("//"), []byte(`\ //`), 1)
-			//outBuf.Write([]byte(` \ `))
+		if idx := bytes.Index(line[:start], []byte(`\`)); idx > 0 {
+			start = idx
 		}
-		outBuf.Write([]byte(byteCode))
-		//outBuf.Write(line[start:])
-		if err := outBuf.Flush(); err != nil {
-			fmt.Println("Bufio error", err)
-		}
+		outBuf.Write(line[start:])
 	}
+
+	if err := outBuf.Flush(); err != nil {
+		return nil, errors.Wrap(err, "Bufio error")
+	}
+
 	return result.Bytes(), nil
 }
 
@@ -141,16 +139,18 @@ func yasm(instr []byte) ([]byte, error) {
 	return objcode, nil
 }
 
-func toPlan9s(objcode []byte, instr string, commentPos int, inDefine bool) (string, error) {
+func toPlan9s(objcode []byte) (string, error) {
 
-	sline := "    "
+	result := bytes.NewBuffer([]byte("    "))
+	outBuf := bufio.NewWriter(result)
+
 	i := 0
 	// First do LONGs (as many as needed)
 	for ; len(objcode) >= 4; i++ {
 		if i != 0 {
-			sline += "; "
+			fmt.Fprint(outBuf, "; ")
 		}
-		sline += fmt.Sprintf("LONG $0x%02x%02x%02x%02x", objcode[3], objcode[2], objcode[1], objcode[0])
+		fmt.Fprintf(outBuf, "LONG $0x%02x%02x%02x%02x", objcode[3], objcode[2], objcode[1], objcode[0])
 
 		objcode = objcode[4:]
 	}
@@ -159,9 +159,9 @@ func toPlan9s(objcode []byte, instr string, commentPos int, inDefine bool) (stri
 	if len(objcode) >= 2 {
 
 		if i != 0 {
-			sline += "; "
+			fmt.Fprint(outBuf, "; ")
 		}
-		sline += fmt.Sprintf("WORD $0x%02x%02x", objcode[1], objcode[0])
+		fmt.Fprintf(outBuf, "WORD $0x%02x%02x", objcode[1], objcode[0])
 
 		i++
 		objcode = objcode[2:]
@@ -170,36 +170,19 @@ func toPlan9s(objcode []byte, instr string, commentPos int, inDefine bool) (stri
 	// And close with a BYTE (if needed)
 	if len(objcode) == 1 {
 		if i != 0 {
-			sline += "; "
+			fmt.Fprint(outBuf, "; ")
 		}
-		sline += fmt.Sprintf("BYTE $0x%02x", objcode[0])
+		fmt.Fprintf(outBuf, "BYTE $0x%02x", objcode[0])
 
 		i++
 		objcode = objcode[1:]
 	}
-
-	if inDefine {
-		if commentPos > commentPos-2-len(sline) {
-			if commentPos-2-len(sline) > 0 {
-				sline += strings.Repeat(" ", commentPos-2-len(sline))
-			}
-		} else {
-			sline += " "
-		}
-		sline += `\ `
-	} else {
-		if commentPos > len(sline) {
-			if commentPos-len(sline) > 0 {
-				sline += strings.Repeat(" ", commentPos-len(sline))
-			}
-		} else {
-			sline += " "
-		}
+	fmt.Fprint(outBuf, " ")
+	if err := outBuf.Flush(); err != nil {
+		return "", errors.Wrap(err, "Bufio error")
 	}
 
-	sline += "// + " + instr
-
-	return sline, nil
+	return result.String(), nil
 }
 
 // startsAfterLongWordByteSequence determines if an assembly instruction
