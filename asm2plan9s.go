@@ -72,23 +72,25 @@ func assemble(input io.Reader, output io.Writer) error {
 	sigil := []byte("// +")
 	for ln := 1; inBuf.Scan(); ln++ {
 		line = inBuf.Bytes()
-		if !bytes.Contains(line, sigil) {
-			output.Write(line)
-			output.Write([]byte{'\n'})
+		start := bytes.Index(line, sigil)
+		if start == -1 {
+			fmt.Fprintln(output, line)
 			continue
 		}
-		start := bytes.Index(line, sigil)
 		instr := bytes.TrimSpace(bytes.SplitN(line[start+len(sigil):], []byte("/*"), 2)[0])
+		if idx := bytes.Index(line[:start], []byte(`\`)); idx != -1 {
+			start = idx // Adjust for in-macro lines
+		}
+		if idx := bytes.Index(line[:start], []byte("#define")); idx != -1 {
+			spl := bytes.SplitN(line[idx:start], []byte{' '}, 3)
+			fmt.Fprintf(output, "%s %s", spl[0], spl[1])
+		}
 		byteCode, err := yasm(convertInstr(instr))
 		if err != nil {
 			return errors.Wrapf(err, "Line %d", ln)
 		}
 
 		toPlan9s(byteCode, output)
-
-		if idx := bytes.Index(line[:start], []byte(`\`)); idx > 0 {
-			start = idx
-		}
 		output.Write(line[start:])
 		output.Write([]byte("\n"))
 	}

@@ -63,6 +63,11 @@ func TestInstruction(t *testing.T) {
 			out: "    LONG $0xc1c60f66; BYTE $0x03 // + SHUFPD $3, X1, X0\n",
 			err: nil,
 		},
+		{testName: "Macro start",
+			ins: " #define macro   LONG $0xd471c1c4; BYTE $0xc0 \\ // + SHUFPD $3, X1, X0",
+			out: "#define macro    LONG $0xc1c60f66; BYTE $0x03 \\ // + SHUFPD $3, X1, X0\n",
+			err: nil,
+		},
 	} {
 		inBuf := bytes.NewReader([]byte(tst.ins))
 		result := bytes.NewBuffer(make([]byte, 0, len(tst.ins)))
