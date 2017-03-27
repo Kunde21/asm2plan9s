@@ -124,9 +124,8 @@ func yasm(instr []byte) ([]byte, error) {
 	defer os.Remove(objFile) // output file created by yasm
 	cmb, err := cmd.CombinedOutput()
 	if err != nil {
-		yasmErrs := bytes.Split(cmb[len(asmFile)+1:], []byte(":"))
-		yasmErr := bytes.Join(yasmErrs[1:], []byte(":"))
-		return nil, errors.Errorf("YASM error on '%s': %s", bytes.TrimSpace(instr), yasmErr)
+		yasmErr := bytes.Replace(cmb, []byte(asmFile+":2:"), []byte("\t"), -1)
+		return nil, errors.Errorf("YASM error on '%s':\n %s", bytes.TrimSpace(instr), yasmErr)
 	}
 
 	objcode, err := ioutil.ReadFile(objFile)
@@ -137,7 +136,7 @@ func yasm(instr []byte) ([]byte, error) {
 	return objcode, nil
 }
 
-func toPlan9s(objcode []byte, output io.Writer) (string, error) {
+func toPlan9s(objcode []byte, output io.Writer) {
 
 	output.Write([]byte("    "))
 	for ln := len(objcode); ln > 0; {
