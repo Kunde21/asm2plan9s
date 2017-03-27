@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"bufio"
+	"bytes"
+	"log"
+	"testing"
+)
 
 func TestInstruction(t *testing.T) {
 
@@ -34,12 +39,19 @@ func TestInstruction(t *testing.T) {
 			err: nil,
 		},
 	} {
-		result, err := assemble([]byte(tst.ins))
+		inBuf := bytes.NewReader([]byte(tst.ins))
+		result := bytes.NewBuffer(make([]byte, 0, len(tst.ins)))
+		outBuf := bufio.NewWriter(result)
+
+		err := assemble(inBuf, outBuf)
 		if err != tst.err {
 			t.Error(err)
 		}
-		if string(result) != tst.out {
-			t.Errorf("Test %d (%s) expected %s\ngot%s", n, tst.testName, tst.out, string(result))
+		if err = outBuf.Flush(); err != nil {
+			log.Fatal("Bufio error: ", err)
+		}
+		if result.String() != tst.out {
+			t.Errorf("Test %d (%s) expected %s\ngot%s", n, tst.testName, tst.out, result.String())
 		}
 	}
 }

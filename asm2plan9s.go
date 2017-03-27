@@ -28,12 +28,20 @@ usage: asm2plan9s file
 		log.Fatalf("readLines: %s", err)
 	}
 
-	result, err := assemble(source)
+	inBuf := bytes.NewReader(source)
+	result := bytes.NewBuffer(make([]byte, 0, len(source)))
+	outBuf := bufio.NewWriter(result)
+
+	err = assemble(inBuf, outBuf)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = ioutil.WriteFile(os.Args[1], result, 0600)
+	if err = outBuf.Flush(); err != nil {
+		log.Fatal("Bufio error: ", err)
+	}
+
+	err = ioutil.WriteFile(os.Args[1], result.Bytes(), 0600)
 	if err != nil {
 		log.Fatalf("writeLines: %s", err)
 	}
@@ -41,17 +49,15 @@ usage: asm2plan9s file
 
 // assemble assembles an array to lines into their
 // resulting plan9 equivalent
-func assemble(lines []byte) ([]byte, error) {
-	inBuf := bufio.NewScanner(bytes.NewReader(lines))
-	result := bytes.NewBuffer(make([]byte, 0, len(lines)))
-	outBuf := bufio.NewWriter(result)
+func assemble(input io.Reader, output io.Writer) error {
+	inBuf := bufio.NewScanner(input)
 
 	var line []byte
 	sigil := []byte("// +")
 	for ln := 1; inBuf.Scan(); ln++ {
 		line = inBuf.Bytes()
 		if !bytes.Contains(line, sigil) {
-			outBuf.Write(line)
+			output.Write(line)
 			continue
 		}
 		start := bytes.Index(line, sigil)
@@ -59,22 +65,18 @@ func assemble(lines []byte) ([]byte, error) {
 		byteCode, err := yasm(instr)
 		//byteCode, err := convertInstr(instr)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Line %d", ln)
+			return errors.Wrapf(err, "Line %d", ln)
 		}
 
-		toPlan9s(byteCode, outBuf)
+		toPlan9s(byteCode, output)
 
 		if idx := bytes.Index(line[:start], []byte(`\`)); idx > 0 {
 			start = idx
 		}
-		outBuf.Write(line[start:])
+		output.Write(line[start:])
 	}
 
-	if err := outBuf.Flush(); err != nil {
-		return nil, errors.Wrap(err, "Bufio error")
-	}
-
-	return result.Bytes(), nil
+	return nil
 }
 
 //
