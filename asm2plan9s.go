@@ -144,40 +144,28 @@ func toPlan9s(objcode []byte) (string, error) {
 	result := bytes.NewBuffer([]byte("    "))
 	outBuf := bufio.NewWriter(result)
 
-	i := 0
-	// First do LONGs (as many as needed)
-	for ; len(objcode) >= 4; i++ {
-		if i != 0 {
-			fmt.Fprint(outBuf, "; ")
+	for ln := len(objcode); ln > 0; {
+		switch {
+		case ln >= 4:
+			fmt.Fprintf(outBuf, "LONG $0x%02x%02x%02x%02x",
+				objcode[3], objcode[2], objcode[1], objcode[0])
+			objcode = objcode[4:]
+			ln -= 4
+		case ln >= 2:
+			fmt.Fprintf(outBuf, "WORD $0x%02x%02x", objcode[1], objcode[0])
+			objcode = objcode[2:]
+			ln -= 2
+		default:
+			fmt.Fprintf(outBuf, "BYTE $0x%02x", objcode[0])
+			objcode = objcode[1:]
+			ln--
 		}
-		fmt.Fprintf(outBuf, "LONG $0x%02x%02x%02x%02x", objcode[3], objcode[2], objcode[1], objcode[0])
-
-		objcode = objcode[4:]
-	}
-
-	// Then do a WORD (if needed)
-	if len(objcode) >= 2 {
-
-		if i != 0 {
+		if ln != 0 {
 			fmt.Fprint(outBuf, "; ")
+		} else {
+			fmt.Fprint(outBuf, " ")
 		}
-		fmt.Fprintf(outBuf, "WORD $0x%02x%02x", objcode[1], objcode[0])
-
-		i++
-		objcode = objcode[2:]
 	}
-
-	// And close with a BYTE (if needed)
-	if len(objcode) == 1 {
-		if i != 0 {
-			fmt.Fprint(outBuf, "; ")
-		}
-		fmt.Fprintf(outBuf, "BYTE $0x%02x", objcode[0])
-
-		i++
-		objcode = objcode[1:]
-	}
-	fmt.Fprint(outBuf, " ")
 	if err := outBuf.Flush(); err != nil {
 		return "", errors.Wrap(err, "Bufio error")
 	}
