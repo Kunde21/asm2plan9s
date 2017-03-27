@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
-	"log"
 	"testing"
 )
 
@@ -70,18 +68,13 @@ func TestInstruction(t *testing.T) {
 		},
 	} {
 		inBuf := bytes.NewReader([]byte(tst.ins))
-		result := bytes.NewBuffer(make([]byte, 0, len(tst.ins)))
-		outBuf := bufio.NewWriter(result)
 
-		err := assemble(inBuf, outBuf)
+		result, err := Assemble(inBuf)
 		if err != tst.err {
 			t.Error(err)
 		}
-		if err = outBuf.Flush(); err != nil {
-			log.Fatal("Bufio error: ", err)
-		}
-		if result.String() != tst.out {
-			t.Errorf("Test %d (%s) expected \n%s\ngot\n%s", n, tst.testName, tst.out, result.String())
+		if string(result) != tst.out {
+			t.Errorf("Test %d (%s) expected \n%s\ngot\n%s", n, tst.testName, tst.out, result)
 		}
 	}
 }
