@@ -9,25 +9,27 @@ Installation
 
 Make sure YASM is installed on your platform. Get the code and compile with `go install`.
 
+usage:  -h help
+	-w write back to the file
+
 Example
 -------
 
 ```
 $ more example.s
                                  // VPADDQ  XMM0,XMM1,XMM8
-$ asm2plan9s example.s
+$ asm2plan9s -w example.s
 $ echo example.s
     LONG $0xd471c1c4; BYTE $0xc0 // VPADDQ  XMM0,XMM1,XMM8
 ```
 
-The instruction to be assembled needs to start with a `//` preceded by either a single space 
-The preceding characters will be overwitten by the correct sequence (irrespective of its contents) so when changing the instruction, rerunning `asm2plan9s` will update the BYTE sequence generated.
 
 Starting position of instruction
 --------------------------------
 
-The starting position of the `//` comment needs to follow the (imaginary) sequence with either a single space or a space followed by a back slash plus another space (see support for defines below).
-Upon first entering an instruction you can type eg `LONG $0x00000000; BYTE $0x00 // VZEROUPPER` to trigger the assembler. 
+The instruction to be assembled needs to start with a `// +` 
+The preceding characters will be overwitten by the correct sequence (irrespective of its contents) so when changing the instruction, rerunning `asm2plan9s` will update the BYTE sequence generated.
+Macro definitions will be preserved, so `#define macro // + VZEROUPPER` won't overwrite the `#define macro ` portion.  
 
 Support for defines
 -------------------
@@ -36,20 +38,47 @@ If you are using #define for 'macros' with the back-slash delimiter to continue 
 
 For instance:
 ```
-                                 \ // VPADDQ  XMM0,XMM1,XMM8
+                                 \ // + VPADDQ  XMM0,XMM1,XMM8
 ```
 
 will be assembled into
 
 ```
-    LONG $0xd471c1c4; BYTE $0xc0 \ // VPADDQ  XMM0,XMM1,XMM8
+    LONG $0xd471c1c4; BYTE $0xc0 \ // + VPADDQ  XMM0,XMM1,XMM8
+```
+
+Support for Intel and GoAsm formats:
+------
+
+Instructions can be in Intel or GoAsm format.  So, both of these lines will assemble to the same byte code:
+
+```
+	// + VFMADD123PD xmm1, xmm0, [rax]
+	// + VFMADD123PD XMM0, (AX), XMM1
+```
+Becomes:
+```
+	LONG $0x98f9e2c4; BYTE $0x08 // + VFMADD123PD xmm1, xmm0, [rax]
+	LONG $0x98f9e2c4; BYTE $0x08 // + VFMADD123PD XMM0, (AX), XMM1
 ```
 
 asmfmt
 ------
 
-asm2plan9s works nicely together with [asmfmt](https://github.com/klauspost/asmfmt) in order to format the assembly code (in a similar style to `go fmt`). 
+Assembled code will be formatted with asmfmt.  
 
+
+emacs
+------
+To run assembler and formatter on save, add a hook in your init file:
+```
+(defun asm-mode-setup ()
+  (set (make-local-variable 'gofmt-command) "asmfmt")
+  (add-hook 'before-save-hook 'gofmt nil t)
+)
+
+(add-hook 'asm-mode-hook 'asm-mode-setup)
+```
 
 Extensive example
 -----------------
