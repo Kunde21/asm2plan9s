@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	help = flag.Bool("h", false, "Print usage instructions")
+	help  = flag.Bool("h", false, "Print usage instructions")
+	write = flag.Bool("w", false, "Write changes to file")
 )
 
 func usage() {
@@ -23,6 +24,7 @@ func usage() {
 }
 
 func main() {
+	fmt.Println(os.Args)
 
 	flag.Parse()
 	if *help {
@@ -45,11 +47,13 @@ func main() {
 		return
 	}
 
+	exitCode := 0
 	files := []string{}
 	for _, g := range os.Args[1:] {
 		f, err := filepath.Glob(g)
 		if err != nil {
 			log.Println(err)
+			exitCode = 2
 		}
 		if f != nil {
 			files = append(files, f...)
@@ -57,13 +61,15 @@ func main() {
 	}
 	if len(files) == 0 {
 		log.Println("No files processed.")
+		exitCode = 2
 	}
 
 	for _, file := range files {
-		fmt.Println("Processing ", file)
+		fmt.Fprintln(os.Stderr, "Processing ", file)
 		source, err := ioutil.ReadFile(file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ReadFile %s: %s", file, err)
+			exitCode = 2
 			continue
 		}
 
@@ -72,18 +78,32 @@ func main() {
 		result, err := Assemble(inBuf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			exitCode = 2
 			continue
 		}
 
 		result, err = asmfmt.Format(bytes.NewReader(result))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "asmfmt error %s: %s", file, err)
+			exitCode = 2
 			continue
 		}
 
-		err = ioutil.WriteFile(os.Args[1], result, 0600)
+		result, err = asmfmt.Format(bytes.NewReader(result))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WriteFile %s: %s", file, err)
+			log.Fatalf("asmfmt error: %s", err)
+			exitCode = 2
+		}
+
+		if *write {
+			err = ioutil.WriteFile(file, result, 0600)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "WriteFile %s: %s", file, err)
+				exitCode = 2
+			}
+		} else {
+			fmt.Println(string(result))
 		}
 	}
+	os.Exit(exitCode)
 }

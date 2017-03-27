@@ -95,6 +95,8 @@ func convertInstr(instr []byte) []byte {
 			}
 		}
 		instr = bytes.Replace(instr, []byte{'$'}, []byte{' '}, -1)
+		instr = bytes.Replace(instr, []byte{'('}, []byte{'['}, -1)
+		instr = bytes.Replace(instr, []byte{')'}, []byte{']'}, -1)
 	}
 
 	return instr
