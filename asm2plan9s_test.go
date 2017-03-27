@@ -66,6 +66,16 @@ func TestInstruction(t *testing.T) {
 			out: "#define macro    LONG $0xc1c60f66; BYTE $0x03 \\ // + SHUFPD $3, X1, X0\n",
 			err: nil,
 		},
+		{testName: "Intel addressing",
+			ins: "     // + VFMADD132PD xmm1, xmm0, [rax]",
+			out: "    LONG $0x98f9e2c4; BYTE $0x08 // + VFMADD132PD xmm1, xmm0, [rax]\n",
+			err: nil,
+		},
+		{testName: "GoAsm addressing",
+			ins: "     // + VFMADD132PD X0, (AX), X1",
+			out: "    LONG $0x98f9e2c4; BYTE $0x08 // + VFMADD132PD X0, (AX), X1\n",
+			err: nil,
+		},
 	} {
 		inBuf := bytes.NewReader([]byte(tst.ins))
 

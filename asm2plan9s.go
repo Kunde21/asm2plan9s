@@ -19,7 +19,7 @@ var (
 
 func init() {
 	reg = regexp.MustCompile("([^R])(AX|CX|DX|BX|SP|BP|SI|DI)")
-	xreg = regexp.MustCompile("([^0])(X|Y)([^M])")
+	xreg = regexp.MustCompile("([^0A-D])(X|Y)([^M])")
 }
 
 // Assemble will provide the byte codes for any instructions flagged with the sigil // + [INSTR]
