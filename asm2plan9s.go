@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -163,43 +162,6 @@ func toPlan9s(objcode []byte, output io.Writer) (string, error) {
 			fmt.Fprint(output, " ")
 		}
 	}
-}
-
-// startsAfterLongWordByteSequence determines if an assembly instruction
-// starts on a position after a combination of LONG, WORD, BYTE sequences
-func startsAfterLongWordByteSequence(prefix string) bool {
-
-	if len(strings.TrimSpace(prefix)) != 0 && !strings.HasPrefix(prefix, "    LONG $0x") &&
-		!strings.HasPrefix(prefix, "    WORD $0x") && !strings.HasPrefix(prefix, "    BYTE $0x") {
-		return false
-	}
-
-	length := 4 + len(prefix) + 1
-
-	for objcodes := 3; objcodes <= 8; objcodes++ {
-
-		ls, ws, bs := 0, 0, 0
-
-		oc := objcodes
-
-		for ; oc >= 4; oc -= 4 {
-			ls++
-		}
-		if oc >= 2 {
-			ws++
-			oc -= 2
-		}
-		if oc == 1 {
-			bs++
-		}
-		size := 4 + ls*(len("LONG $0x")+8) + ws*(len("WORD $0x")+4) + bs*(len("BYTE $0x")+2) + (ls+ws+bs-1)*len("; ")
-
-		if length == size+2 || // comment starts after a space
-			length == size+4 { // comment starts after a space, bash slash and another space
-			return true
-		}
-	}
-	return false
 }
 
 // writeLines writes the lines to the given file.
