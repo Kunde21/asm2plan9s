@@ -18,7 +18,7 @@ var (
 )
 
 func init() {
-	reg = regexp.MustCompile("([^R])(AX|CX|DX|BX|SP|BP|SI|DI)")
+	reg = regexp.MustCompile("([^A-Z0-9])(AX|CX|DX|BX|SP|BP|SI|DI)([^A-Z0-9]*)")
 	xreg = regexp.MustCompile("([^0A-D])(X|Y)([^M])")
 }
 
@@ -65,7 +65,7 @@ func convertInstr(instr []byte) []byte {
 
 	instr = bytes.ToUpper(instr)
 	if reg.Match(instr) || xreg.Match(instr) {
-		instr = reg.ReplaceAll(instr, []byte("${1}R$2"))
+		instr = reg.ReplaceAll(instr, []byte("${1}R${2}$3"))
 		instr = xreg.ReplaceAll(instr, []byte("${1}${2}MM$3"))
 		flds := bytes.FieldsFunc(instr, func(r rune) bool {
 			return r == ' ' || r == '\t' || r == ','
