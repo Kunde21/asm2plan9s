@@ -14,12 +14,13 @@ import (
 )
 
 var (
-	reg, xreg *regexp.Regexp
+	reg, xreg, memCalc *regexp.Regexp
 )
 
 func init() {
-	reg = regexp.MustCompile("([^A-Z0-9])(AX|CX|DX|BX|SP|BP|SI|DI)([^A-Z0-9]*)")
+	reg = regexp.MustCompile("([^A-Z0-9])(AX|CX|DX|BX|SP|BP|SI|DI)")
 	xreg = regexp.MustCompile("([^0A-D])(X|Y)([^M])")
+	memCalc = regexp.MustCompile("[(]([^)]+)[)][(]([^)]+)[)]")
 }
 
 // Assemble will provide the byte codes for any instructions flagged with the sigil // + [INSTR]
@@ -42,7 +43,7 @@ func Assemble(input io.Reader) ([]byte, error) {
 			start = idx // Adjust for in-macro lines
 		}
 		if idx := bytes.Index(line[:start], []byte("#define")); idx != -1 {
-			spl := bytes.SplitN(line[idx:start], []byte{' '}, 3)
+			spl := bytes.Fields(line[idx:start])
 			fmt.Fprintf(output, "%s %s", spl[0], spl[1])
 		}
 		byteCode, err := yasm(convertInstr(instr))
@@ -67,6 +68,7 @@ func convertInstr(instr []byte) []byte {
 	if reg.Match(instr) || xreg.Match(instr) {
 		instr = reg.ReplaceAll(instr, []byte("${1}R${2}$3"))
 		instr = xreg.ReplaceAll(instr, []byte("${1}${2}MM$3"))
+		instr = memCalc.ReplaceAll(instr, []byte("[${2}+${1}]"))
 		flds := bytes.FieldsFunc(instr, func(r rune) bool {
 			return r == ' ' || r == '\t' || r == ','
 		})

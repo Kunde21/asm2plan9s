@@ -81,6 +81,21 @@ func TestInstruction(t *testing.T) {
 			out: "    LONG $0xC8D00F66 // + ADDSUBPD X0, X1\n",
 			err: nil,
 		},
+		{testName: "Go 2-register calculation",
+			ins: "     // + ADDSUBPD (AX)(BX*4), X0",
+			out: "    LONG $0x04D00F66; BYTE $0x98 // + ADDSUBPD (AX)(BX*4), X0\n",
+			err: nil,
+		},
+		{testName: "Go 2-register calculation with offset",
+			ins: "     // + ADDSUBPD 16(AX)(BX*4), X0",
+			out: "    LONG $0x44D00F66; WORD $0x1098 // + ADDSUBPD 16(AX)(BX*4), X0\n",
+			err: nil,
+		},
+		{testName: "LONG + WORD + BYTE output",
+			ins: "     // + MOVDDUP 16(AX)(BX*4), X9",
+			out: "    LONG $0x120F44F2; WORD $0x984C; BYTE $0x10 // + MOVDDUP 16(AX)(BX*4), X9\n",
+			err: nil,
+		},
 	} {
 		inBuf := bytes.NewReader([]byte(tst.ins))
 
