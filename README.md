@@ -17,10 +17,10 @@ Example
 
 ```
 $ more example.s
-                                 // VPADDQ  XMM0,XMM1,XMM8
+                                 // + VPADDQ  XMM0,XMM1,XMM8
 $ asm2plan9s -w example.s
 $ echo example.s
-    LONG $0xd471c1c4; BYTE $0xc0 // VPADDQ  XMM0,XMM1,XMM8
+    LONG $0xd471c1c4; BYTE $0xc0 // + VPADDQ  XMM0,XMM1,XMM8
 ```
 
 
@@ -73,7 +73,7 @@ emacs
 To run assembler and formatter on save, add a hook in your init file:
 ```
 (defun asm-mode-setup ()
-  (set (make-local-variable 'gofmt-command) "asmfmt")
+  (set (make-local-variable 'gofmt-command) "asm2plan9s")
   (add-hook 'before-save-hook 'gofmt nil t)
 )
 
