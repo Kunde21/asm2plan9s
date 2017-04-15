@@ -30,7 +30,7 @@ func Assemble(input io.Reader) ([]byte, error) {
 	output := bufio.NewWriter(result)
 
 	var line []byte
-	sigil := []byte("// +")
+	sigil := []byte("// @")
 	for ln := 1; inBuf.Scan(); ln++ {
 		line = inBuf.Bytes()
 		start := bytes.Index(line, sigil)
@@ -56,7 +56,7 @@ func Assemble(input io.Reader) ([]byte, error) {
 	}
 
 	if err := output.Flush(); err != nil {
-		errors.Wrapf(err, "Bufio error")
+		return nil, errors.Wrapf(err, "Bufio error")
 	}
 	return result.Bytes(), nil
 }
