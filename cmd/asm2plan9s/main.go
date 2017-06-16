@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Kunde21/asm2plan9s"
 	"github.com/klauspost/asmfmt"
 )
 
@@ -29,22 +30,6 @@ func main() {
 	flag.Parse()
 	if *help {
 		usage()
-	}
-
-	if len(os.Args) == 1 {
-		result, err := Assemble(os.Stdin)
-		if err != nil {
-			log.Fatal(err)
-		}
-		result, err = asmfmt.Format(bytes.NewReader(result))
-		if err != nil {
-			log.Fatalf("asmfmt error: %s", err)
-		}
-		_, err = os.Stdout.Write(result)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return
 	}
 
 	exitCode := 0
@@ -75,7 +60,7 @@ func main() {
 
 		inBuf := bytes.NewReader(source)
 
-		result, err := Assemble(inBuf)
+		result, err := asm2plan9s.Assemble("// @", inBuf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			exitCode = 2

@@ -1,4 +1,4 @@
-package main
+package asm2plan9s
 
 import (
 	"bufio"
@@ -23,22 +23,27 @@ func init() {
 	memCalc = regexp.MustCompile("[(]([^)]+)[)][(]([^)]+)[)]")
 }
 
-// Assemble will provide the byte codes for any instructions flagged with the sigil // + [INSTR]
-func Assemble(input io.Reader) ([]byte, error) {
+// Assemble will provide the byte codes for any instructions preceeded by the sigil
+func Assemble(sigil string, input io.Reader) ([]byte, error) {
 	inBuf := bufio.NewScanner(input)
 	result := bytes.NewBuffer(nil)
 	output := bufio.NewWriter(result)
 
-	var line []byte
-	sigil := []byte("// @")
+	var line, sigilb []byte
+	if sigil == "" {
+		sigilb = []byte("// @")
+	} else {
+		sigilb = []byte(sigil)
+	}
 	for ln := 1; inBuf.Scan(); ln++ {
 		line = inBuf.Bytes()
-		start := bytes.Index(line, sigil)
+		start := bytes.Index(line, sigilb)
 		if start == -1 {
 			fmt.Fprintf(output, "%s\n", line)
 			continue
 		}
-		instr := bytes.TrimSpace(bytes.SplitN(line[start+len(sigil):], []byte("/*"), 2)[0])
+		instr := bytes.SplitN(line[start+len(sigil):], []byte("//"), 2)[0]
+		instr = bytes.TrimSpace(bytes.SplitN(instr, []byte("/*"), 2)[0])
 		if idx := bytes.Index(line[:start], []byte(`\`)); idx != -1 {
 			start = idx // Adjust for in-macro lines
 		}
