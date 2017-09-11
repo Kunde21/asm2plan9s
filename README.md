@@ -54,12 +54,12 @@ Instructions can be in Intel or GoAsm format.  So, both of these lines will asse
 
 ```
 	// @ VFMADD123PD xmm1, xmm0, [rax]
-	// @ VFMADD123PD XMM0, (AX), XMM1
+	// @ VFMADD123PD X0, (AX), X1
 ```
 Becomes:
 ```
 	LONG $0x98f9e2c4; BYTE $0x08 // @ VFMADD123PD xmm1, xmm0, [rax]
-	LONG $0x98f9e2c4; BYTE $0x08 // @ VFMADD123PD XMM0, (AX), XMM1
+	LONG $0x98f9e2c4; BYTE $0x08 // @ VFMADD123PD X0, (AX), X1
 ```
 
 asmfmt
